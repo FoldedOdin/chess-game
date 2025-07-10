@@ -1,111 +1,125 @@
 const board = document.getElementById('chessBoard');
-    const selectedInfo = document.getElementById('selectedInfo');
-    const filesTop = document.getElementById('files-top');
-    const filesBottom = document.getElementById('files-bottom');
-    const ranksLeft = document.getElementById('ranks-left');
-    const ranksRight = document.getElementById('ranks-right');
-    const historyList = document.getElementById('historyList');
+const selectedInfo = document.getElementById('selectedInfo');
+const historyList = document.getElementById('historyList');
 
-    const initialBoard = [
-      ['♜','♞','♝','♛','♚','♝','♞','♜'],
-      ['♟','♟','♟','♟','♟','♟','♟','♟'],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['♙','♙','♙','♙','♙','♙','♙','♙'],
-      ['♖','♘','♗','♕','♔','♗','♘','♖']
-    ];
+let selectedSquare = null;
+let turn = 'white';
 
-    let selected = null;
-    let turn = 'white';
+const pieceSymbols = {
+  'P': '♙', 'p': '♟',
+  'R': '♖', 'r': '♜',
+  'N': '♘', 'n': '♞',
+  'B': '♗', 'b': '♝',
+  'Q': '♕', 'q': '♛',
+  'K': '♔', 'k': '♚'
+};
 
-    function toChessNotation(row, col) {
-      const file = String.fromCharCode(65 + col);
-      const rank = 8 - row;
-      return `${file}${rank}`;
+// Simple 2D array for board state (FEN-based layout)
+let gameState = [
+  ['r','n','b','q','k','b','n','r'],
+  ['p','p','p','p','p','p','p','p'],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['P','P','P','P','P','P','P','P'],
+  ['R','N','B','Q','K','B','N','R']
+];
+
+function renderBoard() {
+  board.innerHTML = '';
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const square = document.createElement('div');
+      square.className = `square ${((row + col) % 2 === 0) ? 'white' : 'black'}`;
+      square.dataset.row = row;
+      square.dataset.col = col;
+
+      const piece = gameState[row][col];
+      if (piece) square.textContent = pieceSymbols[piece];
+
+      square.addEventListener('click', onSquareClick);
+      board.appendChild(square);
     }
+  }
+}
 
-    function createBoard() {
-      board.innerHTML = '';
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          const square = document.createElement('div');
-          square.className = `square ${(row + col) % 2 === 0 ? 'white' : 'black'}`;
-          square.dataset.row = row;
-          square.dataset.col = col;
-          square.textContent = initialBoard[row][col];
+function onSquareClick(e) {
+  const row = parseInt(e.currentTarget.dataset.row);
+  const col = parseInt(e.currentTarget.dataset.col);
+  const clickedPiece = gameState[row][col];
 
-          square.addEventListener('click', () => handleClick(row, col));
+  if (selectedSquare) {
+    const [selRow, selCol] = selectedSquare;
+    const selectedPiece = gameState[selRow][selCol];
 
-          board.appendChild(square);
-        }
-      }
-    }
-
-    function populateNotations() {
-      const files = ['A','B','C','D','E','F','G','H'];
-      const ranks = ['8','7','6','5','4','3','2','1'];
-
-      filesTop.innerHTML = '';
-      filesBottom.innerHTML = '';
-      ranksLeft.innerHTML = '';
-      ranksRight.innerHTML = '';
-
-      for (let i = 0; i < 8; i++) {
-        const fileTop = document.createElement('div');
-        const fileBottom = document.createElement('div');
-        const rankLeft = document.createElement('div');
-        const rankRight = document.createElement('div');
-
-        fileTop.textContent = files[i];
-        fileBottom.textContent = files[i];
-        rankLeft.textContent = ranks[i];
-        rankRight.textContent = ranks[i];
-
-        filesTop.appendChild(fileTop);
-        filesBottom.appendChild(fileBottom);
-        ranksLeft.appendChild(rankLeft);
-        ranksRight.appendChild(rankRight);
-      }
-    }
-
-    function handleClick(row, col) {
-      const piece = initialBoard[row][col];
-      const squareIndex = row * 8 + col;
-      const allSquares = board.querySelectorAll('.square');
-
-      if (selected) {
-        const [prevRow, prevCol] = selected;
-        if (prevRow !== row || prevCol !== col) {
-          const moveFrom = toChessNotation(prevRow, prevCol);
-          const moveTo = toChessNotation(row, col);
-          const movedPiece = initialBoard[prevRow][prevCol];
-
-          initialBoard[row][col] = movedPiece;
-          initialBoard[prevRow][prevCol] = '';
-          turn = turn === 'white' ? 'black' : 'white';
-
-          const historyItem = document.createElement('li');
-          historyItem.textContent = `${movedPiece} ${moveFrom} → ${moveTo}`;
-          historyList.appendChild(historyItem);
-        }
-        selected = null;
+    if ((turn === 'white' && selectedPiece === selectedPiece.toUpperCase()) ||
+        (turn === 'black' && selectedPiece === selectedPiece.toLowerCase())) {
+      
+      if (selRow !== row || selCol !== col) {
+        movePiece(selRow, selCol, row, col);
+        selectedSquare = null;
         selectedInfo.textContent = 'No square selected';
-        allSquares.forEach(sq => sq.classList.remove('selected'));
-      } else if (piece && isCorrectTurn(piece)) {
-        selected = [row, col];
-        selectedInfo.textContent = `Selected square: (${row}, ${col}) → ${toChessNotation(row, col)}`;
-        allSquares[squareIndex].classList.add('selected');
+        renderBoard();
+        return;
       }
-
-      createBoard();
     }
+    selectedSquare = null;
+    selectedInfo.textContent = 'No square selected';
+    renderBoard();
+    return;
+  }
 
-    function isCorrectTurn(piece) {
-      return (turn === 'white' && piece === piece.toUpperCase()) ||
-             (turn === 'black' && piece === piece.toLowerCase());
+  if (clickedPiece) {
+    const isWhite = clickedPiece === clickedPiece.toUpperCase();
+    if ((turn === 'white' && isWhite) || (turn === 'black' && !isWhite)) {
+      selectedSquare = [row, col];
+      selectedInfo.textContent = `Selected: ${pieceSymbols[clickedPiece]} at ${String.fromCharCode(97 + col)}${8 - row}`;
+      highlightSquare(row, col);
     }
+  }
+}
 
-    populateNotations();
-    createBoard();
+function movePiece(fromRow, fromCol, toRow, toCol) {
+  const piece = gameState[fromRow][fromCol];
+  const target = gameState[toRow][toCol];
+
+  gameState[toRow][toCol] = piece;
+  gameState[fromRow][fromCol] = '';
+
+  const moveNotation = `${pieceSymbols[piece]} ${String.fromCharCode(97 + fromCol)}${8 - fromRow} → ${String.fromCharCode(97 + toCol)}${8 - toRow}`;
+  const moveEntry = document.createElement('li');
+  moveEntry.textContent = moveNotation;
+  historyList.appendChild(moveEntry);
+
+  turn = (turn === 'white') ? 'black' : 'white';
+}
+
+function highlightSquare(row, col) {
+  renderBoard(); // Clear previous highlights
+  const index = row * 8 + col;
+  const square = board.children[index];
+  if (square) square.classList.add('selected');
+}
+
+// Renders labels (optional enhancement)
+function renderLabels() {
+  const filesTop = document.getElementById('files-top');
+  const filesBottom = document.getElementById('files-bottom');
+  const ranksLeft = document.getElementById('ranks-left');
+  const ranksRight = document.getElementById('ranks-right');
+
+  const files = ['a','b','c','d','e','f','g','h'];
+  const ranks = [8,7,6,5,4,3,2,1];
+
+  for (let i = 0; i < 8; i++) {
+    filesTop.innerHTML += `<div>${files[i]}</div>`;
+    filesBottom.innerHTML += `<div>${files[i]}</div>`;
+    ranksLeft.innerHTML += `<div>${ranks[i]}</div>`;
+    ranksRight.innerHTML += `<div>${ranks[i]}</div>`;
+  }
+}
+
+// Initial setup
+renderLabels();
+renderBoard();
